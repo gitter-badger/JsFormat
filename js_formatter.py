@@ -90,7 +90,7 @@ def is_formattable_buffer(view):
 		return ext_formattable and syntax_formattable
 	if(format_by == "syntax"):
 		return syntax_formattable
-	if(format_by == "ext"):
+	if(format_by == "extension"):
 		return ext_formattable
 
 	return False
