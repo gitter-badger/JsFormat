@@ -43,29 +43,66 @@ def plugin_loaded():
 if is_py2k:
 	plugin_loaded()
 
+def get_extension(view):
+	f_name = view.file_name()
 
-def is_js_buffer(view):
-	fName = view.file_name()
-	vSettings = view.settings()
-	syntaxPath = vSettings.get('syntax')
-	syntax = ""
-	ext = ""
+	if(f_name == None):
+		return None
 
-	if (fName != None): # file exists, pull syntax type from extension
-		ext = os.path.splitext(fName)[1][1:]
-	if(syntaxPath != None):
-		syntax = os.path.splitext(syntaxPath)[0].split('/')[-1].lower()
+	fragments = f_name.split(".")
+	ext = ".".join(fragments[1:]) if len(fragments) > 1 else None
 
-	return ext in ['js', 'json'] or "javascript" in syntax or "json" in syntax
+	return ext
+
+
+def is_formattable_buffer(view):
+	f_name = view.file_name()
+	v_settings = view.settings()
+	syntax_path = v_settings.get('syntax')
+	format_by = s.get("format_by")
+	syntax_list = s.get("format_file_syntax")
+	extension_list = s.get("format_file_extension")
+	ignore_extensions = s.get("always_ignore_extensions")
+	ext = get_extension(view)
+	ext_formattable = False
+	syntax_formattable = False
+
+	# always bail if the extension matches one in the ignore list
+	if (ext in ignore_extensions):
+		return False
+
+	if(format_by == "all"):
+		return True
+
+	# by extension
+	if (ext != None and ext in extension_list):
+		ext_formattable = True
+
+	# by syntax
+	if (syntax_path != None):
+		syntax = os.path.splitext(syntax_path)[0].split('/')[-1].lower()
+		if (syntax in syntax_list):
+			syntax_formattable = True;
+
+	if (format_by == "either"):
+		return ext_formattable or syntax_formattable
+	if(format_by == "both"):
+		return ext_formattable and syntax_formattable
+	if(format_by == "syntax"):
+		return syntax_formattable
+	if(format_by == "ext"):
+		return ext_formattable
+
+	return False
 
 def get_rc_paths(cwd):
 	result = []
 	subs = cwd.split(os.sep)
-	fullPath = ""
+	full_path = ""
 
 	for value in subs:
-		fullPath += value + os.sep
-		result.append(fullPath + '.jsbeautifyrc')
+		full_path += value + os.sep
+		result.append(full_path + '.jsbeautifyrc')
 
 	return result
 
@@ -108,10 +145,10 @@ def augment_options(options, subset):
 	return options
 
 def augment_options_by_rc_files(options, view):
-	fileName = view.file_name()
+	file_name = view.file_name()
 
-	if (fileName != None):
-		files = filter_existing_files(get_rc_paths(os.path.dirname(fileName)))
+	if (file_name != None):
+		files = filter_existing_files(get_rc_paths(os.path.dirname(file_name)))
 		for value in files:
 			jsonOptions = read_json(value)
 			options = augment_options(options, jsonOptions)
@@ -121,13 +158,17 @@ def augment_options_by_rc_files(options, view):
 class PreSaveFormatListner(sublime_plugin.EventListener):
 	"""Event listener to run JsFormat during the presave event"""
 	def on_pre_save(self, view):
-		if(s.get("format_on_save") == True and is_js_buffer(view)):
+		if(s.get("format_on_save") == True and is_formattable_buffer(view)):
 			view.run_command("js_format")
 
 
 class JsFormatCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		settings = self.view.settings()
+
+		if(not is_formattable_buffer(self.view)):
+			sublime.status_message("JsFormat: check your user settings, they say this buffer isn't formattable")
+			return
 
 		# settings
 		opts = jsbeautifier.default_options()
@@ -139,12 +180,12 @@ class JsFormatCommand(sublime_plugin.TextCommand):
 			opts = augment_options_by_rc_files(opts, self.view)
 
 		selection = self.view.sel()[0]
-		formatSelection = False
+		multiple_selection = False
 		# formatting a selection/highlighted area
 		if(len(selection) > 0):
-			formatSelection = True
+			multiple_selection = True
 
-		if formatSelection:
+		if multiple_selection:
 			self.format_selection(edit, opts)
 		else:
 			self.format_whole_file(edit, opts)
@@ -232,4 +273,4 @@ class JsFormatCommand(sublime_plugin.TextCommand):
 			sublime.error_message("JsFormat: Merge failure: '%s'" % err)
 
 	def is_visible(self):
-		return is_js_buffer(self.view)
+		return is_formattable_buffer(self.view)

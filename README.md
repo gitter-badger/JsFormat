@@ -6,11 +6,10 @@ It uses the command-line/python-module javascript formatter from http://jsbeauti
 ## Features
 * javascript/json formatting (obviously)
 * all settings are customizable (whitespace, formatting style, etc..)
+* fine-grained control over when JsFormat is available based on file extension, syntax, etc...
 * .jsbeautifyrc settings files support for even more control on a per-project basis
 * puts the cursor back in the same location it was before formatting (accounts for whitespace/newline changes)
 * Sublime Text 3 support
-
-
 ## Settings
 JsFormat uses whatever tab/indent settings are configured with the standard ```translate_tabs_to_spaces``` and ```tab_size``` sublime settings.
 
@@ -34,14 +33,19 @@ The following **JsFormat** specific settings are also exposed:
 
 - `format_on_save`: false  (format files on buffer save)
 - `jsbeautifyrc_files`: false (see the [.jsbeautifyrc files](#jsbeautifyrc-files) section)
+* `format_by`: "both"  (extenion, syntax, both, either, *)
+* `format_file_extension`: ["js", "json"]
+* `format_file_syntax`: ["javascript", "json"]
+* `always_ignore_extensions`: []
 
-I had temporary lapse of judgment a while back and merged a pull request that modified jsbeautifier. As a result, the functionality that
-was added from that pull request has been lost; ```"ensure_space_before_linestarters"``` is no longer supported.
+`format_by`: this controls whether JsFormat is active based on file extension, buffer syntax, both of those, either of those, or * (enabled for any file/extension). The default is *either*.
 
-The JsFormat specific ```ensure_newline_at_eof_on_save``` setting has also been removed. This functionality exists in sublime core.
+`format_file_extension` + `format_file_syntax`: which file extensions/syntaxs JsFormat accepts when specified by the *format_by* setting.
+
+`always_ignore_extensions`: JsFormat will always be disabled for files with these extensions.
 
 #### jsbeautifyrc files ####
-JsFormat now supports `.jsbeautifyrc` JSON files (disabled by default), which themselves support any of the exposed JsBeautifier options. The option augmentation order is: default options -> user settings -> `.jsbeautifyrc` option files. 
+JsFormat now supports `.jsbeautifyrc` JSON files, which themselves support any of the exposed JsBeautifier options. The option augmentation order is: default options -> user settings -> `.jsbeautifyrc` option files. 
 
 A hierarchy of `.jsbeautifyrc` files is supported, where rc files at the deeper levels override the settings from rc files at higher levels. For example, given the file structure listed below, formatting `/home/you/myProject/app.js` would inherit settings from: default -> user settings -> `/home/you/myProject/.jsbeautifyrc`, while formatting `/home/you/myProject/tests/test.js` would inherit settings from: default -> user settings -> `/home/you/myProject/.jsbeautifyrc` -> `/home/you/myProject/tests/.jsbeautifyrc` 
 
