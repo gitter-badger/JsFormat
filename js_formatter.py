@@ -49,11 +49,8 @@ def get_extension(view):
 	if(f_name == None):
 		return None
 
-	fragments = f_name.split(".")
-	ext = ".".join(fragments[1:]) if len(fragments) > 1 else None
-
-	return ext
-
+	ext = os.path.splitext(f_name)[1][1:]
+	return ext if len(ext) > 0 else None
 
 def is_formattable_buffer(view):
 	f_name = view.file_name()
