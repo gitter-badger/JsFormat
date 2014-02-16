@@ -34,15 +34,39 @@ add_lib_path(libs_path)
 import jsbeautifier, jsbeautifier.unpackers
 import merge_utils
 
-s = None
+default_settings_file = open(os.path.join(directory, "JsFormat.sublime-settings"))
+jsformat_default_settings = json.load(default_settings_file)
+default_settings_file.close()
 
-def plugin_loaded():
-	global s
-	s = sublime.load_settings("JsFormat.sublime-settings")
+class JsFormatSettings(object):
+	"""JsFormatSettings"""
+	def __init__(self, default_settings):
+		super(JsFormatSettings, self).__init__()
+		self.keys = default_settings.keys()
 
-if is_py2k:
-	plugin_loaded()
+		for key in self.keys:
+			setattr(self, key, default_settings[key])
 
+	def load(self, subset):
+		for key in self.keys:
+			value = None
+
+			if isinstance(subset, dict):
+				value = subset[key] if key in subset else None
+			else:
+				value = subset.get(key) if subset.has(key) else None
+
+			if value is not None:
+				setattr(self, key, value)
+
+		
+
+
+def load_settings():
+	sublime_settings = sublime.load_settings("JsFormat.sublime-settings")
+	settings = JsFormatSettings(jsformat_default_settings)
+	settings.load(sublime_settings)
+	return settings
 
 def is_js_buffer(view):
 	fName = view.file_name()
@@ -96,12 +120,18 @@ def augment_options(options, subset):
 	"""	augment @options with defined values in @subset
 
 		options -- a regular old class with public attributes
-	   	subset -- anything with a 'get' callable (json style)
+	   	subset -- regular old class with public attributes
 	"""
 	fields = [attr for attr in dir(options) if not callable(getattr(options, attr)) and not attr.startswith("__")]
 
 	for field in fields:
-		value = subset.get(field)
+		value = None
+
+		if hasattr(subset,"get") and callable(getattr(subset, "get")):
+			value = subset.get(field)
+		else:
+			value = getattr(subset, field) if hasattr(subset, field) == True else None
+
 		if value != None:
 			setattr(options, field, value)
 
@@ -121,21 +151,31 @@ def augment_options_by_rc_files(options, view):
 class PreSaveFormatListner(sublime_plugin.EventListener):
 	"""Event listener to run JsFormat during the presave event"""
 	def on_pre_save(self, view):
-		if(s.get("format_on_save") == True and is_js_buffer(view)):
+		settings = load_settings()
+		view_settings = view.settings()
+
+		if view_settings.has("JsFormat"):
+			settings.load(view_settings.get("JsFormat"))
+
+		if(settings.format_on_save == True and is_js_buffer(view)):
 			view.run_command("js_format")
 
 
 class JsFormatCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
-		settings = self.view.settings()
+		settings = load_settings()
+		view_settings = self.view.settings()
 
-		# settings
+		if view_settings.has("JsFormat"):
+			settings.load(view_settings.get("JsFormat"))
+
+		# view_settings
 		opts = jsbeautifier.default_options()
-		opts.indent_char = " " if settings.get("translate_tabs_to_spaces") else "\t"
-		opts.indent_size = int(settings.get("tab_size")) if opts.indent_char == " " else 1
-		opts = augment_options(opts, s)
+		opts.indent_char = " " if view_settings.get("translate_tabs_to_spaces") else "\t"
+		opts.indent_size = int(view_settings.get("tab_size")) if opts.indent_char == " " else 1
+		opts = augment_options(opts, settings)
 
-		if(s.get("jsbeautifyrc_files") == True):
+		if(settings.jsbeautifyrc_files == True):
 			opts = augment_options_by_rc_files(opts, self.view)
 
 		selection = self.view.sel()[0]
